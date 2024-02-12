@@ -1,0 +1,112 @@
+---
+
+- name: ensure group "zdm" exists
+  group:
+    name: zdm
+    state: present
+
+- name: ensure user "zdmuser" with group "zdm" exists
+  user:
+    name: zdmuser
+    group: zdm
+    createhome: yes
+
+- name: create directories under "/home/zdmuser"
+  file:
+    path: "{{ item }}"
+    state: "directory"
+    owner: "zdmuser"
+  loop:
+    - /home/zdmuser/zdminstall
+    - /home/zdmuser/zdmhome
+    - /home/zdmuser/zdmbase
+
+- name: ensure .ssh directory exists
+  file:
+    path: /home/zdmuser/.ssh
+    state: directory
+    mode: '700'
+    owner: zdmuser
+    group: zdm
+
+- name: generate an OpenSSH keypair
+  become: yes
+  become_user: zdmuser
+  openssh_keypair:
+    path: /home/zdmuser/.ssh/id_rsa
+    type: rsa
+    size: 2048
+
+- name: convert private key to RSA. It is a requirement
+  become: yes
+  become_user: zdmuser
+  shell: "ssh-keygen -p -m PEM -f ~/.ssh/id_rsa -P '' -N ''"
+
+- name: add environment variables to .bash_profile file
+  lineinfile:
+    path: /home/zdmuser/.bash_profile
+    line: '{{ item }}'
+  loop:
+    - 'export ZDMHOME=/home/zdmuser/zdmhome'
+    - 'export ZDMBASE=/home/zdmuser/zdmbase'
+
+- stat: path="/home/zdmuser/zdminstall/zdm21.4.1"
+  register: zdm_binary
+
+- name: unzip binary zip-file to /home/zdmuser/zdminstall
+  become: yes
+  become_user: zdmuser
+  unarchive:
+    src: "/vagrant/provisioning/roles/exa.zdm/files/V1037236-01.zip"
+    dest: /home/zdmuser/zdminstall
+    remote_src: yes
+  when: (not zdm_binary.stat.exists)
+
+- name: check for empty directory
+  find:
+    paths: "{{ zdmhome }}"
+    file_type: any
+  register: result
+
+- name: run zdminstall.sh setup script with specified arguments
+  become: yes
+  become_user: zdmuser
+  environment:
+    - ZDMBASE: "{{ zdmbase }}"
+    - ZDMHOME: "{{ zdmhome }}"
+  command: "/home/zdmuser/zdminstall/zdm21.4.1/zdminstall.sh setup oraclehome=$ZDMHOME oraclebase=$ZDMBASE ziploc=/home/zdmuser/zdminstall/zdm21.4.1/zdm_home.zip"
+  when: result.matched == 0
+  register: output
+- debug: var=output.stdout_lines
+
+- name: start zdmservice
+  become: yes
+  become_user: zdmuser
+  environment:
+    - ZDMBASE: "{{ zdmbase }}"
+    - ZDMHOME: "{{ zdmhome }}"
+  command: "$ZDMHOME/bin/zdmservice start"
+  when: result.matched == 0
+  register: output
+- debug: var=output.stdout_lines
+
+- name: status zdmservice
+  become: yes
+  become_user: zdmuser
+  environment:
+    - ZDMBASE: "{{ zdmbase }}"
+    - ZDMHOME: "{{ zdmhome }}"
+  command: "$ZDMHOME/bin/zdmservice status"
+  register: output
+- debug: var=output.stdout_lines
+
+- name: verify zdmservice
+  become: yes
+  become_user: zdmuser
+  environment:
+    - ZDMBASE: "{{ zdmbase }}"
+    - ZDMHOME: "{{ zdmhome }}"
+  command: "$ZDMHOME/bin/zdmcli -build"
+  register: output
+- debug: var=output.stdout_lines
+

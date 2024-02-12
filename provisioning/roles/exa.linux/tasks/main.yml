@@ -1,0 +1,15 @@
+---
+
+- name: install required linux packages and tools
+  package: name={{ item }} state=installed
+  with_items:
+    - "@Development Tools"
+    - unzip
+    - glibc-devel
+    - expect
+    - libnsl
+    - ncurses-compat-libs
+    - tree
+    - lsof
+    - oraclelinux-developer-release-el8
+    - python36-oci-cli

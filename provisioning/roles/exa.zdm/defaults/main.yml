@@ -1,0 +1,6 @@
+---
+
+tmp_dir: "/tmp"
+
+zdmbase: "/home/zdmuser/zdmbase"
+zdmhome: "/home/zdmuser/zdmhome"

@@ -1,0 +1,4 @@
+.vagrant
+myscripts/*
+env.sh
+*.zip
